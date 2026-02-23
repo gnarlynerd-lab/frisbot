@@ -1,0 +1,6 @@
+# Simple requirements - let pip resolve versions
+fastapi
+uvicorn[standard]
+httpx
+python-dotenv
+pytest
