@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from ..cognitive import CognitiveState, CognitiveContextSerializer
+from ..cognitive.serializer_v2 import CognitivePersonalitySerializer
 from ..llm.client import DeepSeekClient
 from ..llm.prompts import build_conversation_prompt
 from ..models.database import Database
@@ -20,6 +21,7 @@ class ChatRequest(BaseModel):
     message: str
     companion_id: Optional[str] = None
     session_id: Optional[str] = None
+    api_key: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -45,8 +47,11 @@ class CompanionService:
         # In-memory cache for active companions
         self.active_companions: Dict[str, CognitiveState] = {}
     
-    def get_llm_client(self) -> DeepSeekClient:
-        """Get or create LLM client."""
+    def get_llm_client(self, api_key: Optional[str] = None) -> DeepSeekClient:
+        """Get or create LLM client with optional API key override."""
+        if api_key:
+            # Create a new client with the provided API key
+            return DeepSeekClient(api_key=api_key)
         if not self.llm:
             self.llm = DeepSeekClient()
         return self.llm
@@ -97,7 +102,8 @@ class CompanionService:
         self,
         message: str,
         companion_id: Optional[str] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        api_key: Optional[str] = None
     ) -> ChatResponse:
         """
         Process a chat message through the full pipeline.
@@ -132,7 +138,7 @@ class CompanionService:
         
         # Analyze message with DeepSeek
         try:
-            llm_client = self.get_llm_client()
+            llm_client = self.get_llm_client(api_key)
             
             # Get conversation context
             history = self.db.get_conversation_history(companion.companion_id, limit=10)
@@ -153,8 +159,9 @@ class CompanionService:
         # Update cognitive state from message
         prediction_errors = companion.update_from_message(analysis)
         
-        # Serialize cognitive context
-        cognitive_context = CognitiveContextSerializer.serialize(companion, verbose=False)
+        # Serialize cognitive context - use compressed personality version
+        # cognitive_context = CognitiveContextSerializer.serialize(companion, verbose=False)
+        cognitive_context = CognitivePersonalitySerializer.serialize_compressed(companion)
         
         # Save user message to database
         self.db.save_message(
@@ -167,7 +174,7 @@ class CompanionService:
         
         # Generate response with DeepSeek
         try:
-            llm_client = self.get_llm_client()
+            llm_client = self.get_llm_client(api_key)
             
             # Build conversation prompt
             messages = build_conversation_prompt(
@@ -253,7 +260,8 @@ async def chat(request: ChatRequest):
     return await service.process_chat(
         message=request.message,
         companion_id=request.companion_id,
-        session_id=request.session_id
+        session_id=request.session_id,
+        api_key=request.api_key
     )
 
 

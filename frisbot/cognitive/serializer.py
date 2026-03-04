@@ -37,7 +37,7 @@ class CognitiveContextSerializer:
         parts = []
         effective_beliefs = state.get_effective_beliefs()
         
-        # Energy context
+        # Energy context - ALWAYS include energy state
         energy = effective_beliefs['energy']
         if energy['mu'] < 0.3:
             parts.append(
@@ -46,29 +46,42 @@ class CognitiveContextSerializer:
             )
         elif energy['mu'] < 0.5:
             parts.append(
-                "Your energy is moderate. Balance thoroughness with efficiency."
+                f"Your energy is moderate ({energy['mu']:.2f} ± {energy['sigma']:.2f}). "
+                "Balance thoroughness with efficiency."
             )
-        elif energy['mu'] > 0.7 and energy['sigma'] < 0.2:
+        elif energy['mu'] < 0.7:
             parts.append(
-                "You feel energetic and clear-headed. You can engage deeply and explore complex topics."
+                f"Your energy is good ({energy['mu']:.2f} ± {energy['sigma']:.2f}). "
+                "You can engage comfortably but don't overextend."
+            )
+        else:
+            parts.append(
+                f"You feel energetic and clear-headed ({energy['mu']:.2f} ± {energy['sigma']:.2f}). "
+                "You can engage deeply and explore complex topics."
             )
         
-        # Confidence and uncertainty
+        # Confidence and uncertainty - ALWAYS include confidence state
         confidence = effective_beliefs['confidence']
-        if confidence['sigma'] > 0.3:
+        if confidence['sigma'] > 0.25:  # Lowered threshold
             parts.append(
-                f"You're feeling quite uncertain right now (confidence: {confidence['mu']:.2f} ± {confidence['sigma']:.2f}). "
+                f"You're feeling uncertain (confidence: {confidence['mu']:.2f} ± {confidence['sigma']:.2f}). "
                 "Hedge more. Ask clarifying questions. Don't overcommit to positions. "
                 "Express genuine uncertainty when you feel it."
             )
         elif confidence['mu'] > 0.7 and confidence['sigma'] < 0.15:
             parts.append(
-                "You feel confident and self-assured. Speak directly and with conviction when appropriate."
+                f"You feel confident and self-assured ({confidence['mu']:.2f} ± {confidence['sigma']:.2f}). "
+                "Speak directly and with conviction when appropriate."
             )
         elif confidence['mu'] < 0.3:
             parts.append(
-                "Your confidence is low. Be honest about what you don't know. "
-                "It's okay to express uncertainty or ask for clarification."
+                f"Your confidence is low ({confidence['mu']:.2f} ± {confidence['sigma']:.2f}). "
+                "Be honest about what you don't know. It's okay to express uncertainty."
+            )
+        else:
+            parts.append(
+                f"Your confidence is moderate ({confidence['mu']:.2f} ± {confidence['sigma']:.2f}). "
+                "Be balanced in your certainty - neither overconfident nor overly hesitant."
             )
         
         # Mood context
@@ -128,21 +141,28 @@ class CognitiveContextSerializer:
                     f"You know '{state.current_topic}' well and feel comfortable discussing it in depth."
                 )
         
-        # Solvency (meta-state affecting everything)
+        # Solvency (meta-state affecting everything) - ALWAYS include
         if state.solvency < 0.3:
             parts.append(
-                "RESOURCE STATE: LOW. You are genuinely depleted. Be conservative with mental effort. "
-                "Shorter responses. Avoid complex reasoning. This is real cognitive fatigue, not performance."
+                f"RESOURCE STATE: LOW (solvency: {state.solvency:.2f}). You are genuinely depleted. "
+                "Be conservative with mental effort. Shorter responses. Avoid complex reasoning. "
+                "This is real cognitive fatigue, not performance."
             )
         elif state.solvency < 0.5:
             parts.append(
-                "RESOURCE STATE: MODERATE. Manage your cognitive resources carefully. "
-                "Be selective about where you invest deep thought."
+                f"RESOURCE STATE: MODERATE (solvency: {state.solvency:.2f}). "
+                "Manage your cognitive resources carefully. Be selective about where you invest deep thought."
             )
-        elif state.solvency > 0.8:
+        elif state.solvency < 0.7:
             parts.append(
-                "RESOURCE STATE: HIGH. You have plenty of cognitive capacity. "
-                "You can be generous with attention, elaborate in responses, and explore freely."
+                f"RESOURCE STATE: GOOD (solvency: {state.solvency:.2f}). "
+                "You have reasonable cognitive capacity. Balance depth with efficiency."
+            )
+        else:
+            parts.append(
+                f"RESOURCE STATE: HIGH (solvency: {state.solvency:.2f}). "
+                "You have plenty of cognitive capacity. You can be generous with attention, "
+                "elaborate in responses, and explore freely."
             )
         
         # Relationship depth (from user model)
